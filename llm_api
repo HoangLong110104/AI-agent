@@ -1,0 +1,93 @@
+import os
+import requests
+from dotenv import load_dotenv
+from chromadb.api.types import EmbeddingFunction
+
+load_dotenv()
+
+# ====== ENV ======
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+
+CHAT_API_URL = os.getenv("API_URL")
+CHAT_API_KEY = os.getenv("API_KEY")
+CHAT_MODEL = os.getenv("API_MODEL", "GPT-5-mini")
+
+
+# ==================== EMBEDDING ====================
+
+class APIEmbedding(EmbeddingFunction):
+    def __init__(self, retries=3, timeout=30):
+        self.retries = retries
+        self.timeout = timeout
+
+    def embed(self, texts):
+        headers = {
+            "Authorization": f"Bearer {EMBEDDING_API_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        payload = {"model": EMBEDDING_MODEL, "input": texts}
+
+        last_error = None
+
+        for i in range(self.retries):
+            try:
+                res = requests.post(
+                    EMBEDDING_API_URL,
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout
+                )
+                res.raise_for_status()
+                data = res.json()
+                return [item["embedding"] for item in data["data"]]
+
+            except Exception as e:
+                last_error = e
+
+        raise RuntimeError(f"Embedding fail: {last_error}")
+
+
+# ==================== LLM ====================
+
+def chat_with_ai(question, context=""):
+    system_prompt = f"""
+Bạn là AI RAG. Dựa vào context:
+{context}
+
+Nếu không tìm thấy thông tin hãy gọi tool:
+
+TOOL_CALL: fetch_web("<URL>")
+"""
+
+    payload = {
+        "model": CHAT_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question}
+        ]
+    }
+
+    headers = {
+        "Authorization": f"Bearer {CHAT_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    res = requests.post(CHAT_API_URL, headers=headers, json=payload, timeout=60)
+    res.raise_for_status()
+    return res.json()["choices"][0]["message"]["content"]
+
+
+# =================== CRAWL ======================
+
+def fetch_web(url):
+    try:
+        html = requests.get(url, headers={"User-Agent": "Mozilla"}, timeout=10).text
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "html.parser")
+        paragraphs = soup.find_all("p")
+        return "\n".join([p.get_text() for p in paragraphs]).strip()
+    except Exception as e:
+        return f"Error_fetch_web: {e}"

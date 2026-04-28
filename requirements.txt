@@ -1,0 +1,13 @@
+streamlit
+chromadb
+python-dotenv
+requests
+scikit-learn
+pypdf
+python-docx
+python-pptx
+beautifulsoup4
+pillow
+paddleocr
+langgraph
+google-search-results
