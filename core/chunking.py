@@ -3,7 +3,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def structure_aware_chunk(text):
     pattern = r"(?:^|\n)(\d+[.)]\s+[A-Z][^:\n]{2,}:)"
-    parts = re.split(pattern, text)
+    parts = re.split(pattern, text)uiop
 
     if len(parts) >= 3:
         chunks = []
